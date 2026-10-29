@@ -17,11 +17,11 @@ USER app
 # FB_PAGE_ID (and optionally FB_PIXEL_ID, EKO_ADMIN_*) as environment
 # variables. Also set APP_PASSWORD (and APP_USER, APP_SECRET_KEY) for the login:
 # with no APP_PASSWORD the app refuses every request except from itself.
-ENV PORT=5000
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \n  CMD python -c "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','5000')+'/health',timeout=4)"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=4)"]
 
+# Listens on all interfaces (0.0.0.0) so the platform can reach it.
 # One worker on purpose: the dashboard cache and its background refresh live in
 # this process's memory. Threads handle concurrent requests.
-CMD ["sh", "-c", "exec gunicorn --chdir webapp --workers 1 --threads 8 --timeout 180 --bind 0.0.0.0:${PORT} app:app"]
+CMD ["gunicorn", "--chdir", "webapp", "--workers", "1", "--threads", "8", "--timeout", "180", "--bind", "0.0.0.0:5000", "app:app"]

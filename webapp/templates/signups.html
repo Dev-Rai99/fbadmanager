@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signups &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Website Signups</div>
+    </div>
+    <div class="nav">
+      <a href="/">Ad Studio</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/performance">Performance</a>
+      <a href="/experiments">Experiments</a>
+      <a href="/signups" class="active">Signups</a>
+      <a href="/overview">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Who actually signed up on your website</h1>
+    <p>Pulled live from the SBI Kiosk signup site's own admin panel &mdash; the real record of who completed the form, cross-checked against which ones came through a Facebook ad.</p>
+  </div>
+
+  <div class="container container-wide">
+    <div class="status-banner {{ 'connected' if not error else '' }}">{{ icon('info', 20) }}<div>{{ 'Connected to the signup site admin panel.' if not error else error }}</div></div>
+
+    {% if error %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('warning', 48) }}</div>
+      <h3>Couldn't reach the signup admin panel</h3>
+      <p>{{ error }}</p>
+    </div>
+    {% elif not signups %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('chat', 48) }}</div>
+      <h3>No signups recorded yet</h3>
+      <p>Once someone completes the website signup form, it'll show up here automatically.</p>
+    </div>
+    {% else %}
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>Totals across {{ totals.total_signups }} signup{{ 's' if totals.total_signups != 1 }}</h2>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 28) }}</div><div><div class="big-value">{{ totals.total_signups }}</div><div class="metric-label">Total website signups</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('tap', 28) }}</div><div><div class="big-value">{{ totals.facebook_attributed }}</div><div class="metric-label">Came through a Facebook ad</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('target', 28) }}</div><div><div class="big-value">{{ totals.campaign_matched }}</div><div class="metric-label">&mdash; matched to a specific ad</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('box', 28) }}</div><div><div class="big-value">{{ totals.not_facebook }}</div><div class="metric-label">Not from Facebook</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('check', 28) }}</div><div><div class="big-value">{{ totals.strong_qualify }}</div><div class="metric-label">Strongly qualified</div></div></div>
+      </div>
+      {% if not totals.dashboard_cache_warm %}
+      <p class="hint" style="margin-top:16px;">Visit the <a href="/dashboard">Dashboard</a> at least once this session to also match campaign IDs to their actual ad names below &mdash; right now unmatched ones show the raw Meta campaign ID.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('link', 16) }}</span>Facebook Form vs. Website Signup URL</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Two different ways someone can respond to your ads &mdash; compared side by side.</p>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 28) }}</div><div><div class="big-value">{{ totals.facebook_lead_form_leads }}</div><div class="metric-label">Leads via Facebook Lead Form <span class="hint-inline">(from Meta, in-platform)</span></div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('tap', 28) }}</div><div><div class="big-value">{{ totals.facebook_attributed }}</div><div class="metric-label">Signups via Website URL <span class="hint-inline">(real completions, from Facebook ads)</span></div></div></div>
+      </div>
+      {% if totals.facebook_lead_form_leads == 0 and totals.facebook_attributed == 0 %}
+      <p class="hint" style="margin-top:16px;">No data yet from either channel &mdash; this will fill in once the Dashboard has been loaded and signups start coming in.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chat', 16) }}</span>Every signup</h2>
+      <div class="leads-table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Submitted</th><th>Name</th><th>Mobile</th><th>Qualification</th><th>Source</th><th>Shop address</th></tr></thead>
+        <tbody>
+        {% for s in signups %}
+        <tr>
+          <td class="lead-time">{{ s.submitted_at[:16].replace('T',' ') if s.submitted_at else '' }}</td>
+          <td class="lead-name">{{ s.name or '—' }}</td>
+          <td class="lead-phone">{{ s.mobile }}</td>
+          <td>{{ s.qualification_verdict.replace('_', ' ').title() if s.qualification_verdict else '' }}</td>
+          <td>
+            {% if s.attribution_tier == 'campaign_matched' %}
+            <span class="qual-badge qual-yes">Facebook &mdash; {{ s.matched_campaign_name or s.matched_campaign_id }}</span>
+            {% elif s.attribution_tier == 'fbclid_only' %}
+            <span class="qual-badge qual-yes">Facebook &mdash; ad unknown</span>
+            {% else %}
+            <span class="qual-badge qual-unknown">Not Facebook</span>
+            {% endif %}
+          </td>
+          <td class="lead-other">{{ s.shop_address }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+</body>
+</html>

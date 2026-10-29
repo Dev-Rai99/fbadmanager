@@ -1,0 +1,21 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Lead data, snapshots, images and exports (contain personal data)
+data/
+output/
+reports/
+scratch_*.json
+check_out.txt
+*.log
+*.xlsx
+*.csv
+
+# Local tooling / Python
+.claude/
+__pycache__/
+*.pyc
+.venv/
+venv/

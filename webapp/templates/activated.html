@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Activated &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Ad Activated</div>
+    </div>
+    <div class="nav">
+      <a href="/">&larr; Back to Ad Studio</a>
+    </div>
+  </div>
+  <div class="hero">
+    <h1>You're live</h1>
+    <p>Your ad is now active on Meta.</p>
+  </div>
+  <div class="container">
+    <div class="card" style="text-align:center;">
+      <p>Ad <code>{{ result.ad_id }}</code> is now <span class="badge live">ACTIVE</span>.
+         <span class="hint">(Campaign <code>{{ result.campaign_id }}</code> / Ad Set <code>{{ result.ad_set_id }}</code> are the required Meta structure underneath it.)</span></p>
+      <a class="back-link" href="/">&larr; Back to Ad Studio</a>
+    </div>
+  </div>
+</body>
+</html>

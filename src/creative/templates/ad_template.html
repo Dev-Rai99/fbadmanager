@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700;800&family=Poppins:wght@600;700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1536px; height: 1024px; overflow: hidden; font-family: 'Poppins', 'Noto Sans Devanagari', sans-serif; }
+
+  .canvas {
+    position: relative;
+    width: 1536px;
+    height: 1024px;
+    background-image: url('__BACKGROUND_IMAGE__');
+    background-size: cover;
+    background-position: center;
+  }
+
+  .fade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.98) 0%,
+      rgba(255,255,255,0.98) 42%,
+      rgba(255,255,255,0.65) 52%,
+      rgba(255,255,255,0) 62%);
+  }
+
+  .content {
+    position: absolute;
+    top: 0; left: 0;
+    width: 780px;
+    height: 100%;
+    padding: 48px 56px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: __PRIMARY_COLOR__;
+    color: white;
+    border-radius: 14px;
+    padding: 12px 22px;
+    width: fit-content;
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1;
+  }
+  .logo .accent { color: __ACCENT_COLOR__; }
+  .logo-image {
+    max-width: 220px;
+    max-height: 90px;
+    object-fit: contain;
+    display: block;
+  }
+  .logo-sub {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 4px;
+    color: white;
+    background: __PRIMARY_COLOR__;
+    display: block;
+    text-align: center;
+    border-radius: 0 0 10px 10px;
+    margin-top: -6px;
+    padding: 2px 0 6px;
+    width: fit-content;
+  }
+
+  .headline {
+    margin-top: 40px;
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 58px;
+    line-height: 1.15;
+  }
+  .headline .l1 { color: __PRIMARY_COLOR__; display: block; }
+  .headline .l2 { color: __ACCENT_COLOR__; display: block; }
+
+  .subheading {
+    margin-top: 14px;
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: #1c1c1c;
+  }
+
+  .bullets {
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .bullet {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    color: #222;
+  }
+  .bullet .dot {
+    flex: none;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: __PRIMARY_COLOR__;
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .cta-row {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .cta-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: 12px;
+    padding: 14px 20px;
+    color: white;
+    width: fit-content;
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif;
+  }
+  .cta-box.primary { background: __PRIMARY_COLOR__; }
+  .cta-box.accent { background: __ACCENT_COLOR__; }
+  .cta-icon {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex: none;
+  }
+  .cta-text .label { font-size: 15px; font-weight: 600; opacity: 0.9; }
+  .cta-text .value { font-size: 22px; font-weight: 800; }
+
+  .badge-bottom {
+    position: absolute;
+    right: 48px;
+    bottom: 48px;
+    background: __PRIMARY_COLOR__;
+    color: white;
+    border-radius: 14px;
+    padding: 16px 24px;
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  .badge-bottom .brand { font-weight: 800; font-size: 26px; }
+  .badge-bottom .brand .accent { color: __ACCENT_COLOR__; }
+  .badge-bottom .tag { font-weight: 700; font-size: 20px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="fade"></div>
+    <div class="content">
+      <div>
+        __LOGO_HTML__
+      </div>
+
+      <div class="headline">
+        <span class="l1">__HEADLINE_LINE1__</span>
+        <span class="l2">__HEADLINE_LINE2__</span>
+      </div>
+      <div class="subheading">__SUBHEADING__</div>
+
+      <div class="bullets">
+        __BULLETS_HTML__
+      </div>
+
+      <div class="cta-row">
+        __CTA_BOXES_HTML__
+      </div>
+    </div>
+
+    __BOTTOM_BADGE_HTML__
+  </div>
+</body>
+</html>

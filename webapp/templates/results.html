@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run Results &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Run Results</div>
+    </div>
+    <div class="nav">
+      <a href="/">&larr; Back to Ad Studio</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Your ad is ready</h1>
+    <p>Review the creative, targeting, and performance snapshot below.</p>
+  </div>
+
+  <div class="container">
+    <div class="status-banner {{ 'connected' if 'Connected to ad account' in connection_status else '' }}">{{ icon('info', 20) }}<div>{{ connection_status }}</div></div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('pencil', 16) }}</span>Ad Copy Used</h2>
+      <p><strong>Headline:</strong> {{ ad_copy.headline }}<br>
+         <strong>Subheading:</strong> {{ ad_copy.get('subheading', '') }}<br>
+         <strong>CTA:</strong> {{ ad_copy.get('cta_text', ad_copy.cta) }} <span class="hint">({{ ad_copy.cta }})</span></p>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('camera', 16) }}</span>Final Ad Images ({{ final_images|length }})</h2>
+      <div class="gallery">
+        {% for img in final_images %}
+        <figure><img src="/output/{{ img }}" alt="{{ img }}"></figure>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('box', 16) }}</span>Ad Build <span class="badge {{ mode }}">{{ mode|upper }}</span></h2>
+      {% if mode == "error" %}
+      <div class="advice-card warn">
+        <div class="emoji">{{ icon('warning', 22) }}</div>
+        <div>
+          <strong>The ad wasn't built on Meta, but your creative above is safe.</strong><br>
+          {{ build_error }}
+        </div>
+      </div>
+      {% elif mode == "dry_run" %}
+      <p>Nothing was sent to Meta. The payload below is exactly what would have been sent.</p>
+      {% else %}
+      <p>Live ad built on Meta, status <strong>PAUSED</strong>.
+         <span class="hint">(Meta requires every ad to sit inside an Ad Set inside a Campaign &mdash; that's just their required structure, not multiple campaigns on your end.)</span><br>
+         Campaign: <code>{{ result.campaign_id }}</code> &middot; Ad Set: <code>{{ result.ad_set_id }}</code> &middot; Ad: <code>{{ result.ad_id }}</code></p>
+      <form action="/activate" method="post" onsubmit="return confirm('This will start spending up to the daily budget on Meta. Are you sure?');">
+        <input type="hidden" name="campaign_id" value="{{ result.campaign_id }}">
+        <input type="hidden" name="ad_set_id" value="{{ result.ad_set_id }}">
+        <input type="hidden" name="ad_id" value="{{ result.ad_id }}">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <button type="submit" class="secondary">Activate Ad</button>
+      </form>
+      {% endif %}
+      {% if payload_json %}
+      <details style="margin-top:16px;"><summary style="cursor:pointer;font-weight:600;color:var(--primary);">View full payload JSON</summary>
+        <pre>{{ payload_json }}</pre>
+      </details>
+      {% endif %}
+    </div>
+
+    {% if metrics %}
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart', 16) }}</span>Performance Snapshot {% if metrics.source == "mock" %}<span class="hint">(mock &mdash; no live campaign yet)</span>{% endif %}</h2>
+      <div class="summary-grid">
+        <div class="stat-tile"><div class="label">Reach</div><div class="value">{{ metrics.reach }}</div></div>
+        <div class="stat-tile"><div class="label">Impressions</div><div class="value">{{ metrics.impressions }}</div></div>
+        <div class="stat-tile"><div class="label">Clicks</div><div class="value">{{ metrics.clicks }}</div></div>
+        <div class="stat-tile"><div class="label">CTR</div><div class="value">{{ metrics.ctr }}%</div></div>
+        <div class="stat-tile"><div class="label">Spend</div><div class="value">&#8377;{{ metrics.spend }}</div></div>
+        <div class="stat-tile"><div class="label">Leads</div><div class="value">{{ metrics.leads }}</div></div>
+        <div class="stat-tile"><div class="label">CPA</div><div class="value">&#8377;{{ metrics.cpa }}</div></div>
+      </div>
+      <p style="margin-top:20px;"><strong>Optimization agent decisions:</strong></p>
+      <ul class="actions-list">
+        {% for action, reason in actions %}
+        <li class="{{ action }}"><strong>{{ action }}</strong> &mdash; {{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <a class="back-link" href="/">&larr; Run again</a>
+  </div>
+</body>
+</html>

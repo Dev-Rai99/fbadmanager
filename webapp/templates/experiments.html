@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiments &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Experiments</div>
+    </div>
+    <div class="nav">
+      <a href="/">Ad Studio</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/performance">Performance</a>
+      <a href="/experiments" class="active">Experiments</a>
+      <a href="/signups">Signups</a>
+      <a href="/overview">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>What we've tried, and what it taught us</h1>
+    <p>Every comparison the ads have already run, what each one showed, the mistakes not to repeat, and what to test next. Numbers are calculated live from the same data as the Dashboard.</p>
+  </div>
+
+  <div class="container container-wide">
+    {% if error %}
+    <div class="status-banner">{{ icon('warning', 20) }}<div>{{ error }}</div></div>
+    {% endif %}
+    {% if signups_error %}
+    <div class="status-banner">{{ icon('warning', 20) }}<div>Website signups couldn't be loaded, so website results show 0: {{ signups_error }}</div></div>
+    {% endif %}
+    {% if token_expired %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div><strong>Your Meta access token has expired, so these numbers are the last saved ones and can't refresh.</strong> Generate a new token in Meta (Graph API Explorer or your System User), put it in <code>FB_ACCESS_TOKEN</code> in the <code>.env</code> file, and restart the dashboard.</div></div>
+    {% elif refresh_error and dashboard_loaded %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div>The last refresh from Meta failed, so these are the last saved numbers. It will retry automatically.</div></div>
+    {% endif %}
+    <div class="freshness-bar">
+      <span>{% if last_fetch %}Last updated {{ last_fetch[:16].replace('T',' ') }} UTC{% else %}Not loaded yet{% endif %}
+        {% if refreshing %}<span class="refreshing-note">Refreshing from Meta in the background &mdash; this page updates by itself when done.</span>{% endif %}</span>
+    </div>
+
+    {% if not dashboard_loaded %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('refresh', 48) }}</div>
+      <h3>Loading your ads from Meta&hellip;</h3>
+      <p>This takes 1&ndash;3 minutes the first time. The page will fill in by itself.</p>
+    </div>
+    {% else %}
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>At a glance</h2>
+      <div class="verdict-summary">
+        {% for key, label in verdict_names.items() %}
+          {% if verdict_counts.get(key) %}<span class="verdict-chip verdict-{{ key }}"><strong>{{ verdict_counts[key] }}</strong> {{ label }}</span>{% endif %}
+        {% endfor %}
+      </div>
+      <p class="hint" style="margin:12px 0 0;"><strong>Confidence</strong> says how much to trust a result: <strong>High</strong> = at least 30 results in every group compared, <strong>Medium</strong> = at least 10, <strong>Low</strong> = fewer. These are past ads, not controlled tests, so a result shows what a whole setup did, not what one setting did on its own.</p>
+    </div>
+
+    {% if mistakes %}
+    <div class="card mistakes-card">
+      <h2><span class="icon">{{ icon('warning', 16) }}</span>Mistakes not to repeat</h2>
+      <ul class="mistake-list">
+        {% for x in mistakes %}
+        <li><strong>{{ x.from }}.</strong> {{ x.text }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <h2 class="section-title">Experiments already run ({{ experiments|length }})</h2>
+    {% for e in experiments %}
+    <div class="card exp-card" id="exp-{{ e.id }}">
+      <div class="exp-head">
+        <h3 class="exp-title">{{ loop.index }}. {{ e.title }}</h3>
+        <div class="exp-badges">
+          <span class="verdict-chip verdict-{{ e.verdict }}">{{ verdict_names[e.verdict] }}</span>
+          <span class="conf-chip conf-{{ e.confidence|lower }}" title="{{ e.confidence_why }}">Confidence: {{ e.confidence }}</span>
+        </div>
+      </div>
+      <p class="exp-question">{{ e.question }}</p>
+      <p class="exp-did"><strong>What we did:</strong> {{ e.did }}</p>
+      {% if e.rows %}
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr>{% for h in e.headers %}<th{% if not loop.first %} class="num-cell"{% endif %}>{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for r in e.rows %}
+          <tr{% if e.best_row == loop.index0 %} class="perf-best-row"{% endif %}>
+            {% for c in r %}<td{% if not loop.first %} class="num-cell"{% endif %}>{{ c }}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+      <div class="exp-learning">
+        <div class="exp-label">What we learned</div>
+        <ul>{% for l in e.learning %}<li>{{ l }}</li>{% endfor %}</ul>
+        {% if e.dont_repeat %}<p class="exp-dont"><strong>Don't repeat:</strong> {{ e.dont_repeat }}</p>{% endif %}
+        {% if e.note %}<p class="hint" style="margin:8px 0 0;">{{ e.note }}</p>{% endif %}
+        <p class="hint" style="margin:8px 0 0;">Confidence: {{ e.confidence_why }}.</p>
+      </div>
+    </div>
+    {% endfor %}
+
+    <h2 class="section-title">Images and captions</h2>
+    <div class="card exp-card" id="exp-creative">
+      <div class="exp-head">
+        <h3 class="exp-title">Which pictures and captions we've used, and how they did</h3>
+        {% if not creative.pending %}
+        <div class="exp-badges">
+          <span class="verdict-chip verdict-{{ creative.verdict }}">{{ verdict_names[creative.verdict] }}</span>
+          <span class="conf-chip conf-{{ creative.confidence[0]|lower }}" title="{{ creative.confidence[1] }}">Confidence: {{ creative.confidence[0] }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% if creative.pending %}
+      <p class="exp-did"><strong>Not captured yet.</strong> Until now the dashboard threw away each ad's picture and caption text, so ads could never be compared on them. From the next refresh from Meta it saves every ad's picture and caption permanently (Meta's own image links stop working within days), and this section fills in with real results. It needs a working Meta access token to do that first refresh.</p>
+      <div class="exp-learning"><div class="exp-label">What you'll see here once it has loaded</div>
+        <ul>
+          <li>Every distinct picture and caption, with the ads that used it, spend, leads and cost per lead from a targeted pincode.</li>
+          <li>Results by language (Hindi, Punjabi, English), caption length, whether the caption mentions money or the investment, the button used, and image versus video.</li>
+          <li>The picture types we've used, labelled one by one once the images are saved.</li>
+          <li>A plain verdict on whether any creative really beat the others, or whether none did.</li>
+        </ul></div>
+      {% else %}
+      <p class="exp-did"><strong>What we did:</strong> Every ad's saved picture and caption, grouped so that ads using the same picture and words are counted together. Creative details are saved for {{ creative.n_covered }} of {{ creative.n_ads }} ads.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table creative-table">
+        <thead><tr><th>Picture</th><th>Caption and headline</th><th>Used in</th><th class="num-cell">Spend</th><th class="num-cell">Results</th><th class="num-cell">Cost / result</th><th class="num-cell">Quality results</th><th class="num-cell">Cost / quality result</th></tr></thead>
+        <tbody>
+        {% for g in creative.groups %}
+          <tr>
+            <td class="creative-thumb">{% if g.has_image %}<a href="/creative-image/{{ g.ad_id }}" target="_blank"><img src="/creative-image/{{ g.ad_id }}" alt="Ad picture" loading="lazy"></a>{% else %}<span class="hint-inline">not saved</span>{% endif %}
+              <div class="hint-inline">{{ g.type }}{% if g.image_type %} &middot; {{ g.image_type }}{% endif %}</div></td>
+            <td class="wrap-cell creative-text"><div>{{ g.primary_text or '(no caption text saved)' }}</div>
+              {% if g.headline %}<div class="hint-inline"><strong>Headline:</strong> {{ g.headline }}</div>{% endif %}
+              {% if g.cta %}<div class="hint-inline"><strong>Button:</strong> {{ g.cta }}</div>{% endif %}</td>
+            <td class="wrap-cell">{{ g.channel }}<br>{{ g.ads }} ad{{ 's' if g.ads != 1 }}<br><span class="hint-inline">{{ g.built }}</span></td>
+            <td class="num-cell">{{ "₹{:,.0f}".format(g.spend) }}</td>
+            <td class="num-cell">{{ g.results }}</td>
+            <td class="num-cell">{{ "₹{:,.2f}".format(g.cost_per_result) if g.cost_per_result else '-' }}</td>
+            <td class="num-cell">{{ g.quality }}</td>
+            <td class="num-cell">{{ "₹{:,.0f}".format(g.cost_per_quality) if g.cost_per_quality else '-' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="exp-learning">
+        <div class="exp-label">What we learned</div>
+        <ul>{% for l in creative.learning %}<li>{{ l }}</li>{% endfor %}</ul>
+        <p class="hint" style="margin:8px 0 0;">Hindi written in English letters counts as English here. Confidence: {{ creative.confidence[1] }}.</p>
+      </div>
+      {% for t in creative.trait_tables %}
+      <h4 class="perf-subhead">By {{ t.title|lower }}</h4>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr>{% for h in t.headers %}<th{% if not loop.first and loop.index > 2 %} class="num-cell"{% endif %}>{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for r in t.rows %}<tr>{% for c in r %}<td{% if loop.index > 2 %} class="num-cell"{% endif %}>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h3 class="idea-group-title">What competitors and the market do</h3>
+      <p class="hint" style="margin:0 0 12px;">Where the creative ideas below come from.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table ideas-table">
+        <thead><tr><th>Who</th><th>What they do</th><th>What it suggests for us</th><th>Source</th></tr></thead>
+        <tbody>
+        {% for c in competitors %}
+          <tr><td class="wrap-cell"><strong>{{ c.who }}</strong></td><td class="wrap-cell">{{ c.does }}</td><td class="wrap-cell">{{ c.means }}</td>
+            <td class="wrap-cell"><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.label }}</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <ul class="caveat-list">{% for t in competitor_caveats %}<li>{{ t }}</li>{% endfor %}</ul>
+    </div>
+
+    <h2 class="section-title">What to try next ({{ n_ideas }} ideas)</h2>
+    <div class="card">
+      <p class="hint" style="margin:0;">Ordered by how much each could help and how easy it is. None has been tried yet. The <strong>Based on</strong> column says how much to trust the idea: <span class="basis basis-data">Your data</span> means your own numbers point to it, <span class="basis basis-hunch">Untested hunch</span> means it is a reasonable idea we have no evidence on yet, and <span class="basis basis-comp">Competitor research</span> / <span class="basis basis-comp">Market research</span> means it comes from what competitors or published case studies do (see the table above).</p>
+    </div>
+    {% for g in idea_groups %}
+    <div class="card">
+      <h3 class="idea-group-title">{{ g.name }}</h3>
+      <p class="hint" style="margin:0 0 12px;">{{ g.intro }}</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table ideas-table">
+        <thead><tr><th>Priority</th><th>Idea</th><th>Based on</th><th>Why</th><th>How</th><th>How to measure</th><th>Effort</th></tr></thead>
+        <tbody>
+        {% for i in g['items'] %}
+          <tr>
+            <td><span class="prio prio-{{ i.priority|lower }}">{{ i.priority }}</span></td>
+            <td class="wrap-cell"><strong>{{ i.title }}</strong></td>
+            <td class="wrap-cell"><span class="basis basis-{{ 'comp' if ('competitor' in i.basis|lower or 'market' in i.basis|lower) else ('hunch' if 'hunch' in i.basis|lower and 'data' not in i.basis|lower else ('mixed' if 'hunch' in i.basis|lower else ('practice' if 'practice' in i.basis|lower else 'data'))) }}">{{ i.basis }}</span></td>
+            <td class="wrap-cell">{{ i.why }}</td>
+            <td class="wrap-cell">{{ i.how }}</td>
+            <td class="wrap-cell">{{ i.measure }}</td>
+            <td class="wrap-cell">{{ i.effort }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {% if refreshing or not dashboard_loaded %}
+  <script>
+    (function poll() {
+      setTimeout(function () {
+        fetch('/dashboard/status').then(function (r) { return r.json(); }).then(function (s) {
+          if (!s.refreshing) { location.replace(location.pathname); } else { poll(); }
+        }).catch(poll);
+      }, 5000);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

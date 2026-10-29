@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Overview</div>
+    </div>
+    <div class="nav">
+      <a href="/">Ad Studio</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/performance">Performance</a>
+      <a href="/experiments">Experiments</a>
+      <a href="/signups">Signups</a>
+      <a href="/overview" class="active">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Both channels, one page</h1>
+    <p>Facebook Lead Form leads and real website signups, side by side &mdash; how many came through each, and how many are actually qualified.</p>
+  </div>
+
+  <div class="container container-wide">
+    {% if dashboard_error %}
+    <div class="status-banner">{{ icon('info', 20) }}<div>{{ dashboard_error }}</div></div>
+    {% endif %}
+    {% if signups_error %}
+    <div class="status-banner">{{ icon('warning', 20) }}<div>{{ signups_error }}</div></div>
+    {% endif %}
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>Overall leads: {{ totals.overall_total }}</h2>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 28) }}</div><div><div class="big-value">{{ totals.form_leads }}</div><div class="metric-label">Via Facebook Lead Form</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('tap', 28) }}</div><div><div class="big-value">{{ totals.url_signups_total }}</div><div class="metric-label">Via Website Signup URL</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('link', 28) }}</div><div><div class="big-value">{{ totals.url_signups_facebook }}</div><div class="metric-label">&mdash; of which, from a Facebook ad</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('box', 28) }}</div><div><div class="big-value">{{ totals.overall_total }}</div><div class="metric-label">Overall (both channels)</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('check', 16) }}</span>Qualified vs. not qualified</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:18px;">Each channel measures "qualified" differently &mdash; Facebook Form leads must match the ad's targeted pincode AND answer yes to both screening questions (investment amount, franchise background); website signups carry the site's own eligibility verdict. Shown separately so neither is misread as the other.</p>
+
+      <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:10px;">Facebook Lead Form</h3>
+      <div class="metric-grid" style="margin-bottom:22px;">
+        <div class="metric-card"><div class="emoji">{{ icon('check', 24) }}</div><div><div class="big-value">{{ totals.form_qualified }}</div><div class="metric-label">Qualified <span class="hint-inline">(pincode + both questions)</span></div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('target', 24) }}</div><div><div class="big-value">{{ totals.form_pincode_qualified }}</div><div class="metric-label">&mdash; pincode-matched only</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 24) }}</div><div><div class="big-value">{{ totals.form_pincode_checkable }}</div><div class="metric-label">Leads where pincode could be checked</div></div></div>
+      </div>
+
+      <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:10px;">Website Signup URL &mdash; site's own qualification verdict</h3>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="emoji">{{ icon('check', 24) }}</div><div><div class="big-value">{{ totals.url_strong_qualify }}</div><div class="metric-label">Strong qualify</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('warning', 24) }}</div><div><div class="big-value">{{ totals.url_not_qualify }}</div><div class="metric-label">Not qualified</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Where to see the detail</h2>
+      <p class="hint" style="margin-bottom:0;">This page is a summary only &mdash; open <a href="/dashboard">Dashboard</a> for the full per-ad breakdown of Facebook Lead Form leads, or <a href="/signups">Signups</a> for the full list of website signups with names, phone numbers, and attribution.</p>
+    </div>
+  </div>
+</body>
+</html>

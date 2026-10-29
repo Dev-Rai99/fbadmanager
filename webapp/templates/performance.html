@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Performance &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+{% macro money(v) %}{% if v is none %}&mdash;{% else %}&#8377;{{ "{:,.2f}".format(v) }}{% endif %}{% endmacro %}
+{% macro num(v) %}{% if v is none %}&mdash;{% else %}{{ "{:,}".format(v) }}{% endif %}{% endmacro %}
+{% macro group_table(groups, label) %}
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr>
+          <th>Channel</th><th>{{ label }}</th><th class="num-cell">Ads</th><th class="num-cell">Spend</th>
+          <th class="num-cell">Link CTR</th><th class="num-cell">Results</th><th class="num-cell">Cost / result</th>
+          <th class="num-cell">Quality</th><th class="num-cell">Quality %</th><th class="num-cell">Cost / quality</th>
+        </tr></thead>
+        <tbody>
+        {% for g in groups %}
+          <tr>
+            <td>{{ g.channel }}</td><td><strong>{{ g.group }}</strong></td>
+            <td class="num-cell">{{ g.ads }}</td><td class="num-cell">{{ money(g.spend) }}</td>
+            <td class="num-cell">{% if g.ctr is not none %}{{ g.ctr }}%{% else %}&mdash;{% endif %}</td>
+            <td class="num-cell">{{ num(g.results) }}</td><td class="num-cell">{{ money(g.cost_per_result) }}</td>
+            <td class="num-cell">{{ num(g.quality) }}</td>
+            <td class="num-cell">{% if g.quality_rate is not none %}{{ g.quality_rate }}%{% else %}&mdash;{% endif %}</td>
+            <td class="num-cell">{{ money(g.cost_per_quality) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% endmacro %}
+{% macro adlabel(r) %}<strong>{{ r.account }}</strong> &middot; {{ r.channel }} &middot; built {{ r.built }}{% endmacro %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">Ad Performance</div>
+    </div>
+    <div class="nav">
+      <a href="/">Ad Studio</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/performance" class="active">Performance</a>
+      <a href="/experiments">Experiments</a>
+      <a href="/signups">Signups</a>
+      <a href="/overview">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Which ads actually worked</h1>
+    <p>Every ad that spent money, measured on the same scale &mdash; cost per result, cost per quality result, and click-through &mdash; so the differences between them are visible at a glance.</p>
+  </div>
+
+  <div class="container container-wide">
+    {% if error %}
+    <div class="status-banner">{{ icon('warning', 20) }}<div>{{ error }}</div></div>
+    {% endif %}
+    {% if signups_error %}
+    <div class="status-banner">{{ icon('warning', 20) }}<div>Website signups couldn't be loaded, so website ads show 0 results: {{ signups_error }}</div></div>
+    {% endif %}
+    {% if token_expired %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div><strong>Your Meta access token has expired, so these numbers are the last saved ones and can't refresh.</strong> Generate a new token in Meta (Graph API Explorer or your System User), put it in <code>FB_ACCESS_TOKEN</code> in the <code>.env</code> file, and restart the dashboard.</div></div>
+    {% elif refresh_error and dashboard_loaded %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div>The last refresh from Meta failed, so these are the last saved numbers. It will retry automatically.</div></div>
+    {% endif %}
+    <div class="freshness-bar">
+      <span>{% if last_fetch %}Last updated {{ last_fetch[:16].replace('T',' ') }} UTC{% else %}Not loaded yet{% endif %} &mdash; same data as the Dashboard tab.</span>
+      {% if refreshing %}<span class="refreshing-note">Refreshing from Meta in the background &mdash; this page updates by itself when done.</span>{% endif %}
+      <a href="/dashboard?refresh=1" class="freshness-refresh-btn">{{ icon('refresh', 14) }} Refresh from Meta</a>
+    </div>
+
+    {% set best = awards.best_overall %}
+    {% if best %}
+    <div class="card best-ad-card">
+      <div class="best-ad-eyebrow">{{ icon('check', 16) }} Best ad so far</div>
+      <h2 style="margin:6px 0 4px;">{{ adlabel(best) }}</h2>
+      <p class="hint" style="margin:0 0 16px;" title="{{ best.ad_name }}">Campaign {{ best.campaign_id }} &middot; {{ best.status }} &middot; {% if best.n_pincodes %}{{ best.n_pincodes }} pincodes{% else %}{{ best.geo_bucket }}{% endif %}{% if best.target_states %} in {{ best.target_states|join(', ') }}{% endif %} &middot; age {{ best.age_setting }} &middot; {{ best.gender_setting }} &middot; {{ best.placement_setting }} &middot; {{ best.audience_type }}{% if best.audience_detail %} ({{ best.audience_detail }}){% endif %}</p>
+      <div class="metric-grid">
+        <div class="metric-card"><div><div class="big-value">{{ money(best.cost_per_quality) }}</div><div class="metric-label">per {{ 'pincode-matched lead' if best.channel == 'Lead Form' else 'strong-qualify signup' }} &mdash; lowest of any ad</div></div></div>
+        <div class="metric-card"><div><div class="big-value">{{ num(best.quality) }}</div><div class="metric-label">{{ 'pincode-matched leads' if best.channel == 'Lead Form' else 'strong-qualify signups' }} ({{ best.quality_rate }}% of its {{ best.results }} results)</div></div></div>
+        <div class="metric-card"><div><div class="big-value">{{ money(best.cost_per_result) }}</div><div class="metric-label">per {{ 'lead' if best.channel == 'Lead Form' else 'signup' }}</div></div></div>
+        <div class="metric-card"><div><div class="big-value">{{ money(best.spend) }}</div><div class="metric-label">spent</div></div></div>
+      </div>
+      <p class="hint" style="margin:14px 0 0;">Picked by the lowest cost per <em>quality</em> result, among ads with at least {{ min_results }} results and {{ min_quality }} quality results &mdash; a cheap lead that's outside your target area isn't worth much, so raw cost per lead alone isn't the measure.</p>
+    </div>
+    {% endif %}
+
+    {% if verdicts %}
+    <div class="card">
+      <h2><span class="icon">{{ icon('check', 16) }}</span>What worked best, setting by setting</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">For every choice made when building the ads &mdash; age, gender, placements, audience, pincodes, each interest &mdash; the option that produced results most cheaply, and the one that did worst. Settings are judged on cost per quality result where there's enough data, otherwise cost per result. "Who saw the ad" rows use Meta's own split of spend and leads by age, gender and placement.</p>
+      {% for channel in ['Lead Form', 'Website'] %}
+      {% set vs = verdicts|selectattr('channel', 'equalto', channel)|list %}
+      {% if vs %}
+      <h3 class="perf-subhead">{{ channel }} ads</h3>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr><th>Setting</th><th>Best choice</th><th class="num-cell">Best</th><th>Worst choice</th><th class="num-cell">Worst</th><th>Judged on</th></tr></thead>
+        <tbody>
+        {% for v in vs %}
+          {% set key = 'cost_per_quality' if v.basis == 'cost per quality result' else 'cost_per_result' %}
+          <tr>
+            <td><strong>{{ v.dimension }}</strong>{% if v.delivery %} <span class="hint-inline">(who saw it)</span>{% endif %}</td>
+            <td class="wrap-cell">{{ v.winner.group }}</td>
+            <td class="num-cell good-num">{{ money(v.winner[key]) }}</td>
+            <td class="wrap-cell">{% if v.worst %}{{ v.worst.group }}{% else %}<span class="hint-inline">only one option with enough data</span>{% endif %}</td>
+            <td class="num-cell">{% if v.worst %}{{ money(v.worst[key]) }}{% else %}&mdash;{% endif %}</td>
+            <td><span class="hint-inline">{{ v.basis }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>Winners by category</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Different goals, different winners. Cost awards need at least {{ min_results }} results so one lucky cheap lead can't win.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr><th>Category</th><th>Ad</th><th>Value</th></tr></thead>
+        <tbody>
+        {% set labels = [
+          ('cheapest_result', 'Cheapest result (volume)', 'cost_per_result', 'money'),
+          ('most_results', 'Most results', 'results', 'num'),
+          ('most_quality', 'Most quality results', 'quality', 'num'),
+          ('best_ctr', 'Best click-through rate', 'ctr', 'pct'),
+          ('cheapest_lpv', 'Cheapest landing-page visit (website)', 'cost_per_lpv', 'money'),
+        ] %}
+        {% for key, label, field, fmt in labels %}
+          {% set r = awards[key] %}
+          <tr>
+            <td><strong>{{ label }}</strong></td>
+            <td>{% if r %}{{ adlabel(r) }}{% else %}<span class="hint-inline">No ad qualifies yet</span>{% endif %}</td>
+            <td class="num-cell">{% if r %}{% if fmt == 'money' %}{{ money(r[field]) }}{% elif fmt == 'pct' %}{{ r[field] }}%{% else %}{{ num(r[field]) }}{% endif %}{% else %}&mdash;{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>Lead Form vs. Website</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">The two channels, head to head. Website results only count signups that carried a campaign ID &mdash; {{ unattributed_signups }} of {{ total_signups }} signups came in without one and can't be credited to any ad, so website numbers are a minimum.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr><th>Measure</th><th class="num-cell">Lead Form</th><th class="num-cell">Website</th></tr></thead>
+        <tbody>
+          {% set f = channels['Lead Form'] %}{% set w = channels['Website'] %}
+          <tr><td>Ads that spent money</td><td class="num-cell">{{ f.ads }}</td><td class="num-cell">{{ w.ads }}</td></tr>
+          <tr><td>Spend</td><td class="num-cell">{{ money(f.spend) }}</td><td class="num-cell">{{ money(w.spend) }}</td></tr>
+          <tr><td>Impressions</td><td class="num-cell">{{ num(f.impressions) }}</td><td class="num-cell">{{ num(w.impressions) }}</td></tr>
+          <tr><td>Link click-through rate</td><td class="num-cell">{{ f.ctr }}%</td><td class="num-cell">{{ w.ctr }}%</td></tr>
+          <tr><td>Results <span class="hint-inline">(leads / attributed signups)</span></td><td class="num-cell">{{ num(f.results) }}</td><td class="num-cell">{{ num(w.results) }}</td></tr>
+          <tr><td><strong>Cost per result</strong></td><td class="num-cell"><strong>{{ money(f.cost_per_result) }}</strong></td><td class="num-cell"><strong>{{ money(w.cost_per_result) }}</strong></td></tr>
+          <tr><td>Quality results <span class="hint-inline">(pincode-matched / strong-qualify)</span></td><td class="num-cell">{{ num(f.quality) }}</td><td class="num-cell">{{ num(w.quality) }}</td></tr>
+          <tr><td><strong>Cost per quality result</strong></td><td class="num-cell"><strong>{{ money(f.cost_per_quality) }}</strong></td><td class="num-cell"><strong>{{ money(w.cost_per_quality) }}</strong></td></tr>
+        </tbody>
+      </table>
+      </div>
+      {% if f.cost_per_result and w.cost_per_result %}
+      <p class="hint" style="margin:14px 0 0;">A Lead Form result currently costs {{ money(f.cost_per_result) }} against {{ money(w.cost_per_result) }} for an attributed website signup &mdash; about {{ "%.0f"|format(w.cost_per_result / f.cost_per_result) }}&times; cheaper. Website ads win on clicks (the page gets far more visitors) but lose most of them before the application is finished.</p>
+      {% endif %}
+    </div>
+
+
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By age range set on the ad</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">The age range chosen when the ad was built. When Advantage+ Audience is on, Meta may still show the ad a little outside this range.</p>
+      {{ group_table(by_age, 'Age range set') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By gender set on the ad</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">With Advantage+ Audience on, Meta treats gender and age as suggestions, not limits. The "women only" Bank Sakhi ads were still shown mostly to men &mdash; see "Who actually saw the ads" below and each ad's row in the full table.</p>
+      {{ group_table(by_gender, 'Gender set') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By placements set on the ad</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">"Automatic" means Meta chose where to show the ad (Advantage+ placements).</p>
+      {{ group_table(by_placement, 'Placements') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By each interest, behaviour and job title</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Every interest, behaviour, employer and job title used in any ad, with the combined results of the ads that used it. An ad that used several of them counts toward each one, so rows overlap and shouldn't be added together.</p>
+      {{ group_table(by_interest, 'Interest / behaviour / job title') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('eye', 16) }}</span>Who actually saw the ads</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Meta's own split of spend and results by the age, gender and placement of the people who saw each ad, whatever the ad was set to. Results are Lead Form leads, and landing-page visits for Website ads (Meta can't split website signups this way).</p>
+      {% for channel in ['Lead Form', 'Website'] %}
+      <h3 class="perf-subhead">{{ channel }} ads</h3>
+      <div class="delivery-grid">
+      {% for dim, title in [('age', 'Age'), ('gender', 'Gender'), ('platform', 'Platform')] %}
+        {% set table = delivered[channel ~ '|' ~ dim] %}
+        <div class="table-scroll">
+        <table class="leads-table perf-table">
+          <thead><tr><th>{{ title }}</th><th class="num-cell">Spend</th><th class="num-cell">% of spend</th>
+            <th class="num-cell">{{ 'Leads' if channel == 'Lead Form' else 'Landing visits' }}</th><th class="num-cell">Cost each</th></tr></thead>
+          <tbody>
+          {% for r in table %}
+            <tr><td><strong>{{ r.group }}</strong></td><td class="num-cell">{{ money(r.spend) }}</td>
+              <td class="num-cell">{{ r.share_of_spend }}%</td><td class="num-cell">{{ num(r.results) }}</td>
+              <td class="num-cell">{{ money(r.cost_per_result) }}</td></tr>
+          {% else %}
+            <tr><td colspan="5"><span class="hint-inline">No data yet</span></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      {% endfor %}
+      </div>
+      {% set positions = delivered[channel ~ '|position'] %}
+      {% if positions %}
+      <details class="perf-details">
+        <summary>Placement positions ({{ positions|length }})</summary>
+        <div class="table-scroll">
+        <table class="leads-table perf-table">
+          <thead><tr><th>Position</th><th class="num-cell">Spend</th><th class="num-cell">% of spend</th><th class="num-cell">Link CTR</th>
+            <th class="num-cell">{{ 'Leads' if channel == 'Lead Form' else 'Landing visits' }}</th><th class="num-cell">Cost each</th></tr></thead>
+          <tbody>
+          {% for r in positions %}
+            <tr><td><strong>{{ r.group }}</strong></td><td class="num-cell">{{ money(r.spend) }}</td>
+              <td class="num-cell">{{ r.share_of_spend }}%</td>
+              <td class="num-cell">{% if r.ctr is not none %}{{ r.ctr }}%{% else %}&mdash;{% endif %}</td>
+              <td class="num-cell">{{ num(r.results) }}</td><td class="num-cell">{{ money(r.cost_per_result) }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </details>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By audience type &mdash; interests, behaviours, job titles</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Ads that let Meta pick the audience automatically (Advantage+) against ads given a manual list of interests, behaviours or job titles. Lead Form and Website are kept apart because their results mean different things.{% if unknown_targeting %} {{ unknown_targeting }} ad{{ 's' if unknown_targeting != 1 }} still show "Unknown" because Meta hasn't returned their targeting yet.{% endif %}</p>
+      {{ group_table(by_audience, 'Audience') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('link', 16) }}</span>By how many pincodes were targeted</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Narrow targeting (few pincodes) against broad targeting (many pincodes). "Quality" for Lead Form ads means the lead's pincode is one this ad actually targeted, so every ad is judged against its own list.</p>
+      {{ group_table(by_geo, 'Pincodes targeted') }}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('eye', 16) }}</span>By state &mdash; Lead Form ads</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">Spend and impressions come from Meta's own state-level delivery report. Leads are placed in a state by the pincode each person typed in, so state lead counts are approximate near state borders.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr>
+          <th>State</th><th class="num-cell">Spend</th><th class="num-cell">Impressions</th><th class="num-cell">CTR</th>
+          <th class="num-cell">Leads from this state</th><th class="num-cell">Cost / lead</th>
+          <th class="num-cell">In targeted pincode</th><th class="num-cell">Fully qualified</th>
+        </tr></thead>
+        <tbody>
+        {% for s in states %}
+          <tr>
+            <td><strong>{{ s.state }}</strong></td><td class="num-cell">{{ money(s.spend) }}</td>
+            <td class="num-cell">{{ num(s.impressions) }}</td>
+            <td class="num-cell">{% if s.ctr is not none %}{{ s.ctr }}%{% else %}&mdash;{% endif %}</td>
+            <td class="num-cell">{{ num(s.leads) }}</td><td class="num-cell">{{ money(s.cost_per_lead) }}</td>
+            <td class="num-cell">{{ num(s.matched) }}</td><td class="num-cell">{{ num(s.qualified) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% if leads_outside_delivery %}
+      <p class="hint" style="margin:14px 0 0;">Leads that typed a pincode from a state Meta reports no delivery in (usually people who moved, typed a home-town pincode, or mistyped):
+        {% for st, v in leads_outside_delivery.items() %}{{ st }} ({{ v.leads }}){% if not loop.last %}, {% endif %}{% endfor %}.</p>
+      {% endif %}
+      {% if website_states %}
+      <h3 class="perf-subhead">Website ads &mdash; delivery by state</h3>
+      <p class="hint" style="margin-top:0;">Signups don't carry a state in this data, so only spend and clicks are shown for website ads.</p>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr><th>State</th><th class="num-cell">Spend</th><th class="num-cell">Impressions</th><th class="num-cell">CTR</th></tr></thead>
+        <tbody>
+        {% for s in website_states %}
+          <tr><td><strong>{{ s.state }}</strong></td><td class="num-cell">{{ money(s.spend) }}</td>
+            <td class="num-cell">{{ num(s.impressions) }}</td>
+            <td class="num-cell">{% if s.ctr is not none %}{{ s.ctr }}%{% else %}&mdash;{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('target', 16) }}</span>By pincode &mdash; Lead Form ads</h2>
+      <p class="hint" style="margin-top:-8px; margin-bottom:16px;">{{ pincodes_targeted }} pincodes have been targeted by at least one Lead Form ad. Meta doesn't report spend per pincode, so spend here is <strong>estimated</strong> by splitting each ad's spend evenly across the pincodes it targeted.</p>
+      <h3 class="perf-subhead">Pincodes producing leads ({{ top_pincodes|length }})</h3>
+      <div class="table-scroll">
+      <table class="leads-table perf-table">
+        <thead><tr><th>Pincode</th><th>State</th><th class="num-cell">Ads targeting it</th><th class="num-cell">Est. spend</th>
+          <th class="num-cell">Leads in this pincode</th><th class="num-cell">Fully qualified</th><th class="num-cell">Est. cost / lead</th></tr></thead>
+        <tbody>
+        {% for p in top_pincodes %}
+          <tr><td><strong>{{ p.pincode }}</strong></td><td>{{ p.state }}</td><td class="num-cell">{{ p.ads }}</td>
+            <td class="num-cell">{{ money(p.est_spend) }}</td><td class="num-cell">{{ p.matched }}</td>
+            <td class="num-cell">{{ p.qualified }}</td><td class="num-cell">{{ money(p.est_cost_per_match) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% if dead_pincodes %}
+      <h3 class="perf-subhead">Targeted, but no leads yet ({{ dead_pincodes|length }})</h3>
+      <p class="hint" style="margin-top:0;">Highest estimated spend first &mdash; candidates to drop or swap out in the next ad.</p>
+      <div class="pincode-chips">
+        {% for p in dead_pincodes %}<span class="pincode-chip" title="{{ p.state }} &middot; {{ p.ads }} ad{{ 's' if p.ads != 1 }} &middot; est. {{ money(p.est_spend) }}">{{ p.pincode }} <span class="hint-inline">{{ money(p.est_spend) }}</span></span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('box', 16) }}</span>Every ad, side by side ({{ rows|length }})</h2>
+      <div class="perf-controls">
+        <select id="perfChannel" class="filter-select-light">
+          <option value="all">All channels</option>
+          <option value="Lead Form">Lead Form only</option>
+          <option value="Website">Website only</option>
+        </select>
+        <span class="hint-inline">Click any column heading to sort.</span>
+      </div>
+      <div class="table-scroll">
+      <table class="leads-table perf-table" id="perfTable">
+        <thead><tr>
+          <th data-key="label" data-type="text">Ad</th>
+          <th data-key="pins">Setup</th>
+          <th data-key="spend" class="num-cell">Spend</th>
+          <th data-key="impressions" class="num-cell">Impr.</th>
+          <th data-key="ctr" class="num-cell">CTR</th>
+          <th data-key="cpc" class="num-cell">Cost / click</th>
+          <th data-key="lpv" class="num-cell">Landing views</th>
+          <th data-key="results" class="num-cell">Results</th>
+          <th data-key="cpr" class="num-cell">Cost / result</th>
+          <th data-key="quality" class="num-cell">Quality</th>
+          <th data-key="qrate" class="num-cell">Quality %</th>
+          <th data-key="cpq" class="num-cell">Cost / quality</th>
+        </tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr data-channel="{{ r.channel }}"
+              data-label="{{ r.account }} {{ r.built }}"
+              data-pins="{{ r.n_pincodes }}"
+              data-spend="{{ r.spend }}" data-impressions="{{ r.impressions }}" data-ctr="{{ r.ctr }}"
+              data-cpc="{{ r.cpc if r.cpc is not none else '' }}" data-lpv="{{ r.landing_page_views }}"
+              data-results="{{ r.results }}" data-cpr="{{ r.cost_per_result if r.cost_per_result is not none else '' }}"
+              data-quality="{{ r.quality }}" data-qrate="{{ r.quality_rate if r.quality_rate is not none else '' }}"
+              data-cpq="{{ r.cost_per_quality if r.cost_per_quality is not none else '' }}"
+              {% if best and r.ad_id == best.ad_id %}class="perf-best-row"{% endif %}>
+            <td title="{{ r.ad_name }}">{{ adlabel(r) }}<br><span class="hint-inline">{{ r.status }} &middot; {{ r.campaign_id }}</span></td>
+            <td class="targeting-cell">
+              <div class="setup-line"><span class="setup-label">Pincodes</span><div class="setup-value">
+                {% if r.n_pincodes %}{{ r.n_pincodes }}{% if r.target_states %} in {{ r.target_states|join(', ') }}{% endif %}
+                <details class="setup-pins"><summary>show all</summary>{{ r.pincodes|join(', ') }}</details>
+                {% else %}{{ r.geo_bucket }}{% endif %}</div></div>
+              <div class="setup-line"><span class="setup-label">Age</span>{{ r.age_setting }}{% if r.age_note %} <span class="hint-inline">({{ r.age_note }})</span>{% endif %}</div>
+              <div class="setup-line"><span class="setup-label">Gender</span>{{ r.gender_setting }}{% if r.delivered_gender %} <span class="{{ 'warn-inline' if 'only' in r.gender_setting else 'hint-inline' }}">({{ r.delivered_gender }})</span>{% endif %}</div>
+              {% if r.top_age %}<div class="setup-line"><span class="setup-label">Reached most</span>age {{ r.top_age }}</div>{% endif %}
+              <div class="setup-line"><span class="setup-label">Placements</span>{{ r.placement_setting }}</div>
+              <div class="setup-line"><span class="setup-label">Advantage+</span>{% if r.advantage_on is none %}Unknown{% elif r.advantage_on %}On &mdash; Meta can go beyond the settings above{% else %}Off{% endif %}</div>
+              <div class="setup-line"><span class="setup-label">Audience</span><div class="setup-value">{% if r.categories %}
+                {% for label, names in r.categories.items() %}<div><strong>{{ label }}:</strong> {{ names|join(', ') }}</div>{% endfor %}
+                {% else %}{{ 'No interests, behaviours or job titles set' if r.audience_type != 'Unknown' else 'Unknown' }}{% endif %}</div></div>
+            </td>
+            <td class="num-cell">{{ money(r.spend) }}</td>
+            <td class="num-cell">{{ num(r.impressions) }}</td>
+            <td class="num-cell">{{ r.ctr }}%</td>
+            <td class="num-cell">{{ money(r.cpc) }}</td>
+            <td class="num-cell">{{ num(r.landing_page_views) }}</td>
+            <td class="num-cell">{{ num(r.results) }}</td>
+            <td class="num-cell">{{ money(r.cost_per_result) }}</td>
+            <td class="num-cell">{{ num(r.quality) }}</td>
+            <td class="num-cell">{% if r.quality_rate is not none %}{{ r.quality_rate }}%{% else %}&mdash;{% endif %}</td>
+            <td class="num-cell">{{ money(r.cost_per_quality) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="hint" style="margin:14px 0 0;"><strong>Results</strong> = Lead Form leads, or website signups tagged with that ad's campaign ID. <strong>Quality</strong> = pincode-matched leads (Lead Form) or strong-qualify signups (Website). A dash means the ad has none yet, so that cost can't be calculated.</p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var table = document.getElementById('perfTable');
+      if (!table) return;
+      var tbody = table.querySelector('tbody');
+      var channelSel = document.getElementById('perfChannel');
+      var sortKey = null, sortDir = 1;
+
+      channelSel.addEventListener('change', function () {
+        tbody.querySelectorAll('tr').forEach(function (row) {
+          row.style.display = channelSel.value === 'all' || row.dataset.channel === channelSel.value ? '' : 'none';
+        });
+      });
+
+      table.querySelectorAll('th[data-key]').forEach(function (th) {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function () {
+          var key = th.dataset.key;
+          var isText = th.dataset.type === 'text';
+          sortDir = sortKey === key ? -sortDir : (isText ? 1 : (['cpc', 'cpr', 'cpq'].indexOf(key) >= 0 ? 1 : -1));
+          sortKey = key;
+          var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+          rows.sort(function (a, b) {
+            var av = a.dataset[key], bv = b.dataset[key];
+            if (isText) return av.localeCompare(bv) * sortDir;
+            if (av === '' && bv === '') return 0;
+            if (av === '') return 1;
+            if (bv === '') return -1;
+            return (parseFloat(av) - parseFloat(bv)) * sortDir;
+          });
+          rows.forEach(function (r) { tbody.appendChild(r); });
+          table.querySelectorAll('th').forEach(function (h) { h.classList.remove('sorted-asc', 'sorted-desc'); });
+          th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+        });
+      });
+    })();
+  </script>
+  {% if refreshing or not dashboard_loaded %}
+  <script>
+    (function poll() {
+      setTimeout(function () {
+        fetch('/dashboard/status').then(function (r) { return r.json(); }).then(function (s) {
+          if (!s.refreshing) { location.replace(location.pathname); } else { poll(); }
+        }).catch(poll);
+      }, 5000);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

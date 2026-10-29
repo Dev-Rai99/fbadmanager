@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ads Dashboard &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">All Ads Dashboard</div>
+    </div>
+    <div class="nav">
+      <a href="/">Ad Studio</a>
+      <a href="/dashboard" class="active">Dashboard</a>
+      <a href="/performance">Performance</a>
+      <a href="/experiments">Experiments</a>
+      <a href="/signups">Signups</a>
+      <a href="/overview">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Every ad you've run, in one place</h1>
+    <p>Pulled live from Meta &mdash; reach, clicks, landing page views, and who actually saw each ad.</p>
+
+    {% if ads %}
+    <div class="filter-bar">
+      <input type="text" id="filterSearch" class="filter-search" placeholder="Search ad or campaign&hellip;">
+      <select id="filterStatus" class="filter-select">
+        <option value="all">All statuses</option>
+        {% for s in ads|map(attribute='status')|unique %}
+        <option value="{{ s }}">{{ s.title() }}</option>
+        {% endfor %}
+      </select>
+      <select id="filterObjective" class="filter-select">
+        <option value="all">All channels</option>
+        {% for o in ads|map(attribute='objective')|unique %}
+        <option value="{{ o }}">{{ o.replace('_', ' ').title() }}</option>
+        {% endfor %}
+      </select>
+      <select id="filterAccount" class="filter-select">
+        <option value="all">All accounts</option>
+        {% for a in ads|map(attribute='account_name')|unique %}
+        <option value="{{ a }}">{{ a }}</option>
+        {% endfor %}
+      </select>
+      <select id="sortBy" class="filter-select">
+        <option value="default">Newest first</option>
+        <option value="leads_desc">Most leads</option>
+        <option value="spend_desc">Highest spend</option>
+        <option value="cpl_asc">Lowest cost/lead</option>
+        <option value="reach_desc">Most reach</option>
+      </select>
+      <button type="button" id="filterReset" class="filter-reset">Reset</button>
+    </div>
+    <div id="filterCount" class="filter-count"></div>
+    {% endif %}
+  </div>
+
+  <div class="container container-wide">
+    <div class="status-banner {{ 'connected' if 'Connected to ad account' in connection_status else '' }}">{{ icon('info', 20) }}<div>{{ connection_status }}</div></div>
+
+    {% if token_expired %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div><strong>Your Meta access token has expired, so these numbers are the last saved ones and can't refresh.</strong> Generate a new token in Meta (Graph API Explorer or your System User), put it in <code>FB_ACCESS_TOKEN</code> in the <code>.env</code> file, and restart the dashboard.</div></div>
+    {% elif refresh_error and dashboard_loaded %}
+    <div class="status-banner token-banner">{{ icon('warning', 20) }}<div>The last refresh from Meta failed, so these are the last saved numbers. It will retry automatically.</div></div>
+    {% endif %}
+    <div class="freshness-bar">
+      <span>{% if last_fetch %}Last updated {{ last_fetch[:16].replace('T',' ') }} UTC{% else %}Not loaded yet{% endif %} &mdash; refreshes automatically every 5 minutes.</span>
+      {% if refreshing %}<span class="refreshing-note">Refreshing from Meta in the background &mdash; this page updates by itself when done.</span>{% endif %}
+      <a href="/dashboard?refresh=1" class="freshness-refresh-btn">{{ icon('refresh', 14) }} Refresh now</a>
+    </div>
+
+    {% if not ads and refreshing %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('refresh', 48) }}</div>
+      <h3>Loading your ads from Meta&hellip;</h3>
+      <p>This takes 1&ndash;3 minutes the first time. You can leave this page open &mdash; it will fill in by itself. After this, the dashboard opens instantly.</p>
+    </div>
+    {% elif error %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('warning', 48) }}</div>
+      <h3>Couldn't reach Meta</h3>
+      <p>{% if error == 'TOKEN_EXPIRED' %}Your Meta access token has expired. Generate a new one, put it in <code>FB_ACCESS_TOKEN</code> in the <code>.env</code> file, and restart the dashboard.{% else %}{{ error }}{% endif %}</p>
+    </div>
+    {% elif not ads %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('chart', 48) }}</div>
+      <h3>No delivered ads found</h3>
+      <p>None of the campaigns visible to this Meta token have an actual ad with delivery data yet &mdash; only campaign/ad-set shells. Once an ad has run, it will show up here automatically.</p>
+    </div>
+    {% else %}
+
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>Totals across {{ ads|length }} ad{{ 's' if ads|length != 1 }}</h2>
+      <div class="status-summary">
+        <span class="status-count"><span class="dot live"></span>{{ totals.active_count }} Active</span>
+        <span class="status-count"><span class="dot completed"></span>{{ totals.completed_count }} Completed</span>
+        {% if totals.other_count %}<span class="status-count"><span class="dot other"></span>{{ totals.other_count }} Paused / other</span>{% endif %}
+      </div>
+      {% if all_leads %}
+      <div class="lead-date-bar">
+        <span class="lead-date-label">Filter leads by date</span>
+        <input type="date" id="dateFrom" class="date-input" title="From date">
+        <span class="date-sep">to</span>
+        <input type="date" id="dateTo" class="date-input" title="To date">
+        <button type="button" class="filter-apply-btn" onclick="applyDateFilter()">Apply</button>
+        <button type="button" class="filter-clear-btn" onclick="clearAllLeadsFilter()">Clear</button>
+        <span id="dateRangeNote" class="lead-date-note"></span>
+      </div>
+      {% endif %}
+      <div class="metric-grid">
+        <div class="metric-card"><div class="emoji">{{ icon('eye', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.reach) }}</div><div class="metric-label">Total reach</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('box', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.impressions) }}</div><div class="metric-label">Total views (impressions)</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('tap', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.link_clicks) }}</div><div class="metric-label">Clicks on your URL</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('link', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.landing_page_views) }}</div><div class="metric-label">Landing page views</div></div></div>
+        {% if all_leads %}
+        <div class="metric-card metric-clickable" onclick="toggleAllLeadsPanel()">
+          <div class="emoji">{{ icon('chat', 28) }}</div><div><div class="big-value" id="countAll" data-default="{{ "{:,}".format(totals.leads) }}">{{ "{:,}".format(totals.leads) }}</div><div class="metric-label">Leads / form fills &mdash; click to view</div></div>
+          <a class="metric-download-btn" id="dlAll" data-base="/dashboard/download-all" href="/dashboard/download-all" title="Download all leads (Excel)" onclick="event.stopPropagation()">{{ icon('download', 14) }}</a>
+        </div>
+        <div class="metric-card metric-clickable" onclick="filterAllLeads('qualified')">
+          <div class="emoji">{{ icon('check', 28) }}</div><div><div class="big-value" id="countQualified" data-default="{{ "{:,}".format(totals.qualified_leads) }}">{{ "{:,}".format(totals.qualified_leads) }}</div><div class="metric-label">Qualified leads &mdash; click to view <span class="hint-inline">(pincode + both questions)</span></div></div>
+          <a class="metric-download-btn" id="dlQualified" data-base="/dashboard/download-all?filter=qualified" href="/dashboard/download-all?filter=qualified" title="Download qualified leads only (Excel)" onclick="event.stopPropagation()">{{ icon('download', 14) }}</a>
+        </div>
+        <div class="metric-card metric-clickable" onclick="filterAllLeads('pincode')">
+          <div class="emoji">{{ icon('target', 28) }}</div><div><div class="big-value" id="countPincode" data-default="{{ "{:,}".format(totals.pincode_qualified_leads) }}">{{ "{:,}".format(totals.pincode_qualified_leads) }}</div><div class="metric-label">&mdash; pincode-matched only &mdash; click to view</div></div>
+          <a class="metric-download-btn" id="dlPincode" data-base="/dashboard/download-all?filter=pincode" href="/dashboard/download-all?filter=pincode" title="Download pincode-matched leads only (Excel)" onclick="event.stopPropagation()">{{ icon('download', 14) }}</a>
+        </div>
+        {% else %}
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.leads) }}</div><div class="metric-label">Leads / form fills</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('check', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.qualified_leads) }}</div><div class="metric-label">Qualified leads <span class="hint-inline">(pincode + both questions)</span></div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('target', 28) }}</div><div><div class="big-value">{{ "{:,}".format(totals.pincode_qualified_leads) }}</div><div class="metric-label">&mdash; pincode-matched only</div></div></div>
+        {% endif %}
+        <div class="metric-card"><div class="emoji">{{ icon('money', 28) }}</div><div><div class="big-value">&#8377;{{ "{:,.2f}".format(totals.spend) }}</div><div class="metric-label">Total spend</div></div></div>
+      </div>
+
+      {% if all_leads %}
+      <div id="all-leads-panel" class="leads-panel">
+        <div class="all-leads-head">
+          <h3 style="margin:0;">All leads from every Facebook Form ad ({{ all_leads|length }} &middot; {{ all_leads|selectattr('qualified')|list|length }} qualified)</h3>
+          <a class="download-btn" id="dlPanel" data-base="/dashboard/download-all" href="/dashboard/download-all">{{ icon('download', 16) }}Download (Excel)</a>
+        </div>
+        <p class="hint" style="margin:-4px 0 12px;">The date range set above the lead totals also applies to this table and to every download button.</p>
+        <div id="all-leads-filter-banner" class="filter-banner" style="display:none;">
+          <span>Showing: <strong id="all-leads-filter-label"></strong></span>
+          <button type="button" class="filter-clear-btn" onclick="clearAllLeadsFilter()">Show all leads</button>
+        </div>
+        <p class="hint">Combined across every ad on this page &mdash; the "Ad" column shows which specific ad each lead came from. "Qualified" requires the pincode to match AND both screening questions (investment amount, franchise background) answered yes.</p>
+        <div class="leads-table-wrap">
+        <table class="leads-table">
+          <thead><tr><th class="lead-ad-col">Ad</th><th>Submitted</th><th>Name</th><th>Phone</th><th>Qualified</th><th>Pincode qualified</th><th>Other answers</th></tr></thead>
+          <tbody>
+          {% for lead in all_leads %}
+          <tr data-qualified="{{ '1' if lead.qualified else '0' }}" data-pincode-qualified="{{ '1' if lead.pincode_qualified else '0' }}" data-date="{{ lead.created_time[:10] if lead.created_time else '' }}">
+            <td class="lead-ad-col" title="{{ lead._ad_name }}"><strong>{{ lead._account_name }}</strong><br><span class="lead-ad-name">{{ lead._ad_built_date[:10] if lead._ad_built_date else 'Unknown date' }}</span></td>
+            <td class="lead-time">{{ lead.created_time[:16].replace('T',' ') if lead.created_time else '' }}</td>
+            <td class="lead-name">{{ lead.answers.get('Full name', '') }}</td>
+            <td class="lead-phone">{{ lead.answers.get('Phone number', '') }}</td>
+            <td class="lead-qualified">
+              {% if lead.qualified %}
+              <span class="qual-badge qual-yes">Qualified</span>
+              {% else %}
+              <span class="qual-badge qual-no">Not qualified</span>
+              {% endif %}
+            </td>
+            <td class="lead-qualified">
+              {% if lead.submitted_pincode is none %}
+              <span class="qual-badge qual-unknown">No pincode found</span>
+              {% elif lead.pincode_qualified is none %}
+              <span class="qual-badge qual-unknown">Could not check ({{ lead.submitted_pincode }})</span>
+              {% elif lead.pincode_qualified %}
+              <span class="qual-badge qual-yes">Qualified ({{ lead.submitted_pincode }})</span>
+              {% else %}
+              <span class="qual-badge qual-no">Not qualified ({{ lead.submitted_pincode }})</span>
+              {% endif %}
+            </td>
+            <td class="lead-other">
+              {% for label, val in lead.answers.items() if label not in ['Full name', 'Phone number'] %}
+              <div><span class="lead-q">{{ label }}:</span> {{ val }}</div>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="noResults" class="card empty-state" style="display:none;">
+      <div class="emoji">{{ icon('warning', 40) }}</div>
+      <h3>No ads match these filters</h3>
+      <p>Try clearing a filter or the search box.</p>
+    </div>
+
+    {% for ad in ads %}
+    <div class="card ad-card"
+      data-order="{{ loop.index0 }}"
+      data-name="{{ ((ad.ad_name or ad.campaign_name) ~ ' ' ~ ad.account_name)|lower }}"
+      data-status="{{ ad.status }}"
+      data-objective="{{ ad.objective }}"
+      data-account="{{ ad.account_name }}"
+      data-leads="{{ ad.metrics.leads }}"
+      data-spend="{{ ad.metrics.spend }}"
+      data-cpl="{{ (ad.metrics.spend / ad.metrics.leads) if ad.metrics.leads else '' }}"
+      data-reach="{{ ad.metrics.reach }}">
+      <div class="ad-card-head">
+        {% if ad.thumbnail_url %}
+        <img class="ad-thumb" src="{{ ad.thumbnail_url }}" alt="">
+        {% else %}
+        <div class="ad-thumb ad-thumb-placeholder">{{ icon('camera', 26) }}</div>
+        {% endif %}
+        <div class="ad-head-text">
+          <h2 style="margin:0 0 4px;">{{ ad.ad_name or ad.campaign_name }}</h2>
+          <div class="ad-meta">
+            <span class="badge {{ 'live' if ad.status == 'ACTIVE' else ('completed' if ad.status == 'COMPLETED' else 'dry_run') }}">{{ ad.status }}</span>
+            <span>{{ ad.account_name }}</span>
+            <span>&middot;</span>
+            <span>{{ ad.objective }}</span>
+            {% if ad.created_time %}<span>&middot;</span><span>Built {{ ad.created_time[:16].replace('T',' ') }}</span>{% endif %}
+            {% if ad.first_impression_date %}<span>&middot;</span><span>First seen {{ ad.first_impression_date }}{% if ad.first_impression_hour %} {{ ad.first_impression_hour }}{% endif %}</span>{% endif %}
+          </div>
+        </div>
+        {% if ad.leads_data %}
+        <a class="download-btn" href="/dashboard/download/{{ ad.ad_id }}">{{ icon('download', 16) }}Download leads (Excel)</a>
+        {% endif %}
+      </div>
+
+      <div class="metric-grid" style="margin-top:16px;">
+        <div class="metric-card"><div class="emoji">{{ icon('eye', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.reach) }}</div><div class="metric-label">Reach</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('box', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.impressions) }}</div><div class="metric-label">Views</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('tap', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.link_clicks) }}</div><div class="metric-label">URL clicks</div></div></div>
+        <div class="metric-card"><div class="emoji">{{ icon('link', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.landing_page_views) }}</div><div class="metric-label">Landing views</div></div></div>
+        {% if ad.leads_data %}
+        <div class="metric-card metric-clickable" onclick="document.getElementById('leads-{{ ad.ad_id }}').classList.toggle('open')">
+          <div class="emoji">{{ icon('chat', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.leads) }}</div><div class="metric-label">Leads &mdash; click to view</div>
+          {% if ad.targeting_summary.pincode_check_ok %}
+          <div class="metric-sublabel">{{ ad.leads_data|selectattr('qualified')|list|length }} qualified</div>
+          {% else %}
+          <div class="metric-sublabel metric-sublabel-warn">Pincode check unavailable this load</div>
+          {% endif %}
+          </div>
+        </div>
+        {% else %}
+        <div class="metric-card"><div class="emoji">{{ icon('chat', 24) }}</div><div><div class="big-value">{{ "{:,}".format(ad.metrics.leads) }}</div><div class="metric-label">Leads</div></div></div>
+        {% endif %}
+        <div class="metric-card"><div class="emoji">{{ icon('money', 24) }}</div><div><div class="big-value">&#8377;{{ "{:,.2f}".format(ad.metrics.spend) }}</div><div class="metric-label">Spend &middot; CTR {{ ad.metrics.ctr }}%</div></div></div>
+      </div>
+
+      {% if ad.leads_data %}
+      <div id="leads-{{ ad.ad_id }}" class="leads-panel">
+        <h3>Leads from this ad ({{ ad.leads_data|length }} &middot; {% if ad.targeting_summary.pincode_check_ok %}{{ ad.leads_data|selectattr('qualified')|list|length }} qualified{% else %}pincode check unavailable this load{% endif %})</h3>
+        <p class="hint">If this lead form is also used by other ads, Meta doesn't tell us exactly which ad each lead came from -- the count is accurate (from this ad's own delivery data), but which specific entries are shown is a best-effort match. "Qualified" requires the pincode to match this ad's targeting AND both screening questions (investment amount, franchise background) answered yes.</p>
+        <div class="leads-table-wrap">
+        <table class="leads-table">
+          <thead><tr><th>Submitted</th><th>Name</th><th>Phone</th><th>Qualified</th><th>Pincode qualified</th><th>Other answers</th></tr></thead>
+          <tbody>
+          {% for lead in ad.leads_data %}
+          <tr>
+            <td class="lead-time">{{ lead.created_time[:16].replace('T',' ') if lead.created_time else '' }}</td>
+            <td class="lead-name">{{ lead.answers.get('Full name', '') }}</td>
+            <td class="lead-phone">{{ lead.answers.get('Phone number', '') }}</td>
+            <td class="lead-qualified">
+              {% if lead.qualified %}
+              <span class="qual-badge qual-yes">Qualified</span>
+              {% else %}
+              <span class="qual-badge qual-no">Not qualified</span>
+              {% endif %}
+            </td>
+            <td class="lead-qualified">
+              {% if lead.submitted_pincode is none %}
+              <span class="qual-badge qual-unknown">No pincode found</span>
+              {% elif lead.pincode_qualified is none %}
+              <span class="qual-badge qual-unknown">Could not check ({{ lead.submitted_pincode }})</span>
+              {% elif lead.pincode_qualified %}
+              <span class="qual-badge qual-yes">Qualified ({{ lead.submitted_pincode }})</span>
+              {% else %}
+              <span class="qual-badge qual-no">Not qualified ({{ lead.submitted_pincode }})</span>
+              {% endif %}
+            </td>
+            <td class="lead-other">
+              {% for label, val in lead.answers.items() if label not in ['Full name', 'Phone number'] %}
+              <div><span class="lead-q">{{ label }}:</span> {{ val }}</div>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="button" class="breakdown-toggle" onclick="document.getElementById('breakdown-{{ ad.ad_id }}').classList.toggle('open'); this.classList.toggle('open')">
+        {{ icon('chart-bars', 16) }}<span>Age, placement &amp; region breakdown</span><span class="chevron">&#9662;</span>
+      </button>
+      <div id="breakdown-{{ ad.ad_id }}" class="breakdown-grid">
+        <div class="breakdown-col">
+          <h3>Age &amp; gender</h3>
+          {% if ad.breakdowns.age_gender %}
+          <table class="bd-table">
+            {% for row in ad.breakdowns.age_gender|sort(attribute='impressions', reverse=true) %}
+            <tr>
+              <td class="bd-label">{{ row.age }} &middot; {{ row.gender }}</td>
+              <td class="bd-bar-cell"><div class="bd-bar" style="width: {{ (row.impressions|int / ad.metrics.impressions * 100) if ad.metrics.impressions else 0 }}%;"></div></td>
+              <td class="bd-num">{{ "{:,}".format(row.impressions|int) }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% else %}<p class="hint">No breakdown data yet.</p>{% endif %}
+        </div>
+
+        <div class="breakdown-col">
+          <h3>Placement</h3>
+          {% if ad.breakdowns.platform %}
+          <table class="bd-table">
+            {% for row in ad.breakdowns.platform|sort(attribute='impressions', reverse=true) %}
+            <tr>
+              <td class="bd-label">{{ row.publisher_platform }} &middot; {{ row.platform_position }}</td>
+              <td class="bd-bar-cell"><div class="bd-bar accent" style="width: {{ (row.impressions|int / ad.metrics.impressions * 100) if ad.metrics.impressions else 0 }}%;"></div></td>
+              <td class="bd-num">{{ "{:,}".format(row.impressions|int) }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% else %}<p class="hint">No breakdown data yet.</p>{% endif %}
+        </div>
+
+        <div class="breakdown-col">
+          <h3>Region</h3>
+          {% if ad.breakdowns.region %}
+          <table class="bd-table">
+            {% for row in ad.breakdowns.region|sort(attribute='impressions', reverse=true) %}
+            <tr>
+              <td class="bd-label">{{ row.region }}</td>
+              <td class="bd-bar-cell"><div class="bd-bar" style="width: {{ (row.impressions|int / ad.metrics.impressions * 100) if ad.metrics.impressions else 0 }}%;"></div></td>
+              <td class="bd-num">{{ "{:,}".format(row.impressions|int) }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% else %}<p class="hint">No breakdown data yet.</p>{% endif %}
+        </div>
+
+        <div class="breakdown-col">
+          <h3>Targeting configured</h3>
+          <p class="hint targeting-hint">Meta only reports delivery down to state ("region") level -- it has no pincode/district breakdown. This shows what was actually configured instead.</p>
+          <div class="targeting-block">
+            <div class="targeting-label">Locations targeted</div>
+            <ul class="targeting-list">
+            {% for loc in ad.targeting_summary.locations %}
+              <li>{{ loc }}</li>
+            {% endfor %}
+            </ul>
+          </div>
+          <div class="targeting-block">
+            <div class="targeting-label">Interests &amp; behaviors</div>
+            <p class="targeting-text">{{ ad.targeting_summary.interests_behaviors }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% endif %}
+  </div>
+
+  <script>
+    (function () {
+      var cards = Array.prototype.slice.call(document.querySelectorAll('.ad-card'));
+      if (!cards.length) return;
+
+      var search = document.getElementById('filterSearch');
+      var statusSel = document.getElementById('filterStatus');
+      var objectiveSel = document.getElementById('filterObjective');
+      var accountSel = document.getElementById('filterAccount');
+      var sortSel = document.getElementById('sortBy');
+      var resetBtn = document.getElementById('filterReset');
+      var countEl = document.getElementById('filterCount');
+      var noResults = document.getElementById('noResults');
+      var container = cards[0].parentElement;
+
+      function apply() {
+        var q = search.value.trim().toLowerCase();
+        var status = statusSel.value;
+        var objective = objectiveSel.value;
+        var account = accountSel.value;
+        var visible = 0;
+
+        cards.forEach(function (card) {
+          var matches = true;
+          if (q && card.dataset.name.indexOf(q) === -1) matches = false;
+          if (status !== 'all' && card.dataset.status !== status) matches = false;
+          if (objective !== 'all' && card.dataset.objective !== objective) matches = false;
+          if (account !== 'all' && card.dataset.account !== account) matches = false;
+          card.style.display = matches ? '' : 'none';
+          if (matches) visible++;
+        });
+
+        var sortKey = sortSel.value;
+        var sortedCards = cards.slice();
+        if (sortKey === 'default') {
+          sortedCards.sort(function (a, b) { return (+a.dataset.order) - (+b.dataset.order); });
+        } else {
+          var field = sortKey === 'leads_desc' ? 'leads' : sortKey === 'spend_desc' ? 'spend' : sortKey === 'cpl_asc' ? 'cpl' : 'reach';
+          var desc = sortKey !== 'cpl_asc';
+          sortedCards.sort(function (a, b) {
+            var av = a.dataset[field] === '' ? (desc ? -1 : Infinity) : parseFloat(a.dataset[field]);
+            var bv = b.dataset[field] === '' ? (desc ? -1 : Infinity) : parseFloat(b.dataset[field]);
+            return desc ? bv - av : av - bv;
+          });
+        }
+        sortedCards.forEach(function (card) { container.appendChild(card); });
+
+        countEl.textContent = 'Showing ' + visible + ' of ' + cards.length + ' ads';
+        noResults.style.display = visible === 0 ? '' : 'none';
+      }
+
+      [search, statusSel, objectiveSel, accountSel, sortSel].forEach(function (el) {
+        el.addEventListener('input', apply);
+        el.addEventListener('change', apply);
+      });
+      resetBtn.addEventListener('click', function () {
+        search.value = '';
+        statusSel.value = 'all';
+        objectiveSel.value = 'all';
+        accountSel.value = 'all';
+        sortSel.value = 'default';
+        apply();
+      });
+
+      apply();
+    })();
+
+    function toggleAllLeadsPanel() {
+      var panel = document.getElementById('all-leads-panel');
+      if (!panel) return;
+      var opening = !panel.classList.contains('open');
+      panel.classList.toggle('open');
+      if (opening) {
+        currentMode = null;
+        renderLeads(true);
+      }
+    }
+
+    var currentMode = null;
+
+    function dateRange() {
+      var f = document.getElementById('dateFrom');
+      var t = document.getElementById('dateTo');
+      return { from: f ? f.value : '', to: t ? t.value : '' };
+    }
+
+    function rangeText(r) {
+      return r.from && r.to ? r.from + ' to ' + r.to : r.from ? 'from ' + r.from : 'up to ' + r.to;
+    }
+
+    function inRange(row, r) {
+      if (!r.from && !r.to) return true;
+      var d = row.dataset.date || '';
+      return !!d && (!r.from || d >= r.from) && (!r.to || d <= r.to);
+    }
+
+    function updateCardsAndLinks() {
+      var r = dateRange();
+      var active = r.from || r.to;
+      var all = 0, q = 0, pin = 0;
+      document.querySelectorAll('#all-leads-panel tbody tr').forEach(function (row) {
+        if (!inRange(row, r)) return;
+        all++;
+        if (row.dataset.qualified === '1') q++;
+        if (row.dataset.pincodeQualified === '1') pin++;
+      });
+      [['countAll', all], ['countQualified', q], ['countPincode', pin]].forEach(function (pair) {
+        var el = document.getElementById(pair[0]);
+        if (el) el.textContent = active ? pair[1].toLocaleString() : el.dataset.default;
+      });
+      var params = [];
+      if (r.from) params.push('from=' + r.from);
+      if (r.to) params.push('to=' + r.to);
+      var qs = params.join('&');
+      ['dlAll', 'dlQualified', 'dlPincode', 'dlPanel'].forEach(function (id) {
+        var a = document.getElementById(id);
+        if (!a) return;
+        var base = a.dataset.base;
+        a.href = qs ? base + (base.indexOf('?') >= 0 ? '&' : '?') + qs : base;
+      });
+      var note = document.getElementById('dateRangeNote');
+      if (note) note.textContent = active ? 'Showing leads ' + rangeText(r) : '';
+    }
+
+    function renderLeads(openPanel) {
+      var panel = document.getElementById('all-leads-panel');
+      if (!panel) return;
+      var r = dateRange();
+      panel.querySelectorAll('tbody tr').forEach(function (row) {
+        var ok = inRange(row, r);
+        if (ok && currentMode === 'qualified') ok = row.dataset.qualified === '1';
+        if (ok && currentMode === 'pincode') ok = row.dataset.pincodeQualified === '1';
+        row.style.display = ok ? '' : 'none';
+      });
+      var parts = [];
+      if (currentMode === 'qualified') parts.push('Qualified leads only (pincode + both questions)');
+      if (currentMode === 'pincode') parts.push('Pincode-matched leads only');
+      if (r.from || r.to) parts.push('submitted ' + rangeText(r));
+      var banner = document.getElementById('all-leads-filter-banner');
+      var label = document.getElementById('all-leads-filter-label');
+      if (banner && label) {
+        label.textContent = parts.join(', ');
+        banner.style.display = parts.length ? 'flex' : 'none';
+      }
+      if (openPanel) {
+        panel.classList.add('open');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function filterAllLeads(mode) {
+      currentMode = mode;
+      renderLeads(true);
+    }
+
+    function applyDateFilter() {
+      var r = dateRange();
+      if (r.from && r.to && r.from > r.to) {
+        alert('The start date is after the end date.');
+        return;
+      }
+      updateCardsAndLinks();
+      var panel = document.getElementById('all-leads-panel');
+      renderLeads(!!(panel && panel.classList.contains('open')));
+    }
+
+    function clearAllLeadsFilter() {
+      currentMode = null;
+      var f = document.getElementById('dateFrom');
+      var t = document.getElementById('dateTo');
+      if (f) f.value = '';
+      if (t) t.value = '';
+      updateCardsAndLinks();
+      renderLeads(false);
+    }
+  </script>
+  {% if refreshing or not dashboard_loaded %}
+  <script>
+    (function poll() {
+      setTimeout(function () {
+        fetch('/dashboard/status').then(function (r) { return r.json(); }).then(function (s) {
+          if (!s.refreshing) { location.replace(location.pathname); } else { poll(); }
+        }).catch(poll);
+      }, 5000);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

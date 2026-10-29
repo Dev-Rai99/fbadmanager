@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdMarketer &mdash; Eko CSP Ad Studio</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% from "_icons.html" import icon %}
+  <div class="topbar">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <div>
+      <div class="title">AdMarketer</div>
+      <div class="subtitle">SBI Kiosk Operator Ad Studio</div>
+    </div>
+    <div class="nav">
+      <a href="/" class="active">Ad Studio</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/performance">Performance</a>
+      <a href="/experiments">Experiments</a>
+      <a href="/signups">Signups</a>
+      <a href="/overview">Overview</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Build &amp; launch your recruitment ad</h1>
+    <p>Locked copy, real branding, data-backed targeting &mdash; fill in what's below and click Run.</p>
+  </div>
+
+  <div class="container">
+    <div class="status-banner {{ 'connected' if 'Connected to ad account' in connection_status else '' }}">{{ icon('info', 20) }}<div>{{ connection_status }}</div></div>
+
+    {% if has_insights %}
+    <div class="card">
+      <h2><span class="icon">{{ icon('chart', 16) }}</span>How Is Your Ad Doing?</h2>
+
+      {% if metrics.source == "mock" %}
+      <div class="plain-note">{{ icon('info', 18) }}<div>No Facebook account is connected yet, so these are example numbers &mdash; not real results.</div></div>
+      {% else %}
+      <div class="plain-note">{{ icon('check', 18) }}<div>Pulled directly from your live ad on Facebook.</div></div>
+      {% endif %}
+
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="emoji">{{ icon('eye', 28) }}</div>
+          <div><div class="big-value">{{ metrics.reach }}</div><div class="metric-label">People who saw your ad</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="emoji">{{ icon('tap', 28) }}</div>
+          <div><div class="big-value">{{ metrics.clicks }}</div><div class="metric-label">People who tapped on it</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="emoji">{{ icon('chat', 28) }}</div>
+          <div><div class="big-value">{{ metrics.leads }}</div><div class="metric-label">People who reached out</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="emoji">{{ icon('money', 28) }}</div>
+          <div><div class="big-value">&#8377;{{ metrics.spend }}</div><div class="metric-label">Spent so far</div></div>
+        </div>
+      </div>
+
+      {% if metrics.cpa %}
+      <div class="plain-note" style="margin-top:14px;">{{ icon('target', 18) }}<div>On average, it's costing about <strong>&#8377;{{ metrics.cpa }}</strong> to get one person to reach out.
+        {% if guardrails.target_cpa %}Your target was &#8377;{{ guardrails.target_cpa }} per person.{% endif %}</div>
+      </div>
+      {% endif %}
+
+      <p style="margin-top:20px;font-weight:700;">What should you do?</p>
+      {% for a in explained_actions %}
+      <div class="advice-card {{ a.tone }}">
+        <div class="emoji">{{ icon(a.icon, 24) }}</div>
+        <div>{{ a.text }}</div>
+      </div>
+      {% endfor %}
+
+      <form action="/refresh_insights" method="post" style="margin-top:14px;">
+        <button type="submit" class="refresh-btn">{{ icon('refresh', 16) }} Check for Updates</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="card empty-state">
+      <div class="emoji">{{ icon('chart', 48) }}</div>
+      <h3>No ad yet</h3>
+      <p>Once you build an ad below, this section will show how many people saw it, tapped on it, and reached out.</p>
+    </div>
+    {% endif %}
+
+    <form action="/run" method="post">
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('pencil', 16) }}</span>Ad Brief</h2>
+        <label>Product / opportunity</label>
+        <input name="product" value="SBI Kiosk Operator / CSP Agent opportunity">
+        <label>Description</label>
+        <textarea name="description" rows="2">Run your own SBI Customer Service Point (CSP) kiosk and earn a stable local income.</textarea>
+        <div class="row">
+          <div>
+            <label>Objective</label>
+            <select name="objective">
+              <option value="leads" selected>Leads</option>
+              <option value="sales">Sales</option>
+              <option value="traffic">Traffic</option>
+              <option value="awareness">Awareness</option>
+              <option value="engagement">Engagement</option>
+            </select>
+          </div>
+          <div>
+            <label>Language</label>
+            <select name="language">
+              <option value="hindi" selected>Hindi</option>
+              <option value="english">English</option>
+            </select>
+          </div>
+          <div>
+            <label>Creative angle</label>
+            <select name="angle">
+              <option value="general_opportunity" selected>General opportunity</option>
+              <option value="women_first">Women-first</option>
+              <option value="shop_owner">Shop-owner</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('chat', 16) }}</span>Ad Copy</h2>
+        <label>Use a locked caption (final approved text) or generate new</label>
+        <select name="caption_choice">
+          {% for i, raw in locked_captions %}
+          <option value="{{ i }}">Caption {{ i }}: {{ raw }}</option>
+          {% endfor %}
+          <option value="generate">Generate new copy (not pre-approved)</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('brand', 16) }}</span>Brand</h2>
+        <label>Logo file path (locked decision: real logo only, no AI recreation)</label>
+        <input name="logo_path" value="{{ default_logo }}">
+        <div class="row">
+          <div><label>Brand name (fallback if no logo)</label><input name="brand_name" value="eko"></div>
+          <div><label>Sub-brand</label><input name="brand_subtitle" value="KIOSK"></div>
+          <div><label>Primary color</label><input type="color" name="primary_color" value="#1b4f9c"></div>
+          <div><label>Accent color</label><input type="color" name="accent_color" value="#f5821f"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('target', 16) }}</span>Targeting</h2>
+        <div class="districts-note">Priority: {{ priority_districts|join(', ') }} &nbsp;|&nbsp; <span class="excluded">Excluded (saturated): {{ excluded_districts|join(', ') }}</span></div>
+        <label>Districts to target</label>
+        <input name="districts" value="{{ priority_districts|join(',') }}">
+        <div class="row">
+          <div><label>Min age</label><input type="number" name="age_min" value="21"></div>
+          <div><label>Max age</label><input type="number" name="age_max" value="45"></div>
+          <div><label>Gender</label>
+            <select name="gender"><option value="all" selected>All</option><option value="male">Male</option><option value="female">Female</option></select>
+          </div>
+          <div><label>Daily budget (INR)</label><input type="number" name="daily_budget" value="500"></div>
+          <div><label>Days</label><input type="number" name="schedule_days" value="7"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('link', 16) }}</span>Attachment / Destination</h2>
+        <div class="row">
+          <div><label>Website URL</label><input name="url" value="kiosk.eko.in/signup"></div>
+          <div><label>Call / WhatsApp number</label><input name="number" value="+91 7291988625"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('camera', 16) }}</span>Creative Generation</h2>
+        <label>Number of background images to generate</label>
+        <input type="number" name="image_count" value="4" min="1" max="8">
+        <div class="hint">Generated via Pollinations.ai (free). For ChatGPT-quality images, generate manually and drop files in <code>output/</code>, then run the compositor on them directly.</div>
+      </div>
+
+      <div class="card">
+        <h2><span class="icon">{{ icon('chart-bars', 16) }}</span>Optimization Agent</h2>
+        <label>Target CPA</label>
+        <input type="number" name="target_cpa" value="150">
+      </div>
+
+      <div class="run-btn-wrap">
+        <button type="submit">Generate &amp; Build Ad</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

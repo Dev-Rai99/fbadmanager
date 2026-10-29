@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in &mdash; AdMarketer</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .login-card { width: 100%; max-width: 360px; background: #fff; border-radius: 14px; padding: 28px 24px;
+                box-shadow: 0 6px 24px rgba(0,0,0,0.10); }
+  .login-card img { height: 36px; margin-bottom: 14px; }
+  .login-card h1 { font-size: 20px; margin: 0 0 4px; }
+  .login-card p { margin: 0 0 18px; color: #5a6472; font-size: 13px; }
+  .login-card label { display: block; font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
+  .login-card input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c9ced6; border-radius: 8px; font-size: 14px; }
+  .login-card button { width: 100%; margin-top: 18px; padding: 11px; border: 0; border-radius: 8px; background: var(--primary, #1f3a5f);
+                       color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 150ms ease; }
+  .login-card button:hover { opacity: 0.9; }
+  .login-error { margin-top: 12px; padding: 9px 12px; background: #fdecec; color: #9b1c1c; border-radius: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <form class="login-card" method="post" action="/login" autocomplete="on">
+    <img src="/static/eko-logo.svg" alt="eko">
+    <h1>Sign in</h1>
+    <p>AdMarketer: Facebook ads dashboard</p>
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" autocomplete="username" autofocus required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    {% if error %}<div class="login-error" role="alert">{{ error }}</div>{% endif %}
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+</body>
+</html>

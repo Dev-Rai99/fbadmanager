@@ -15,7 +15,8 @@ USER app
 
 # Secrets are NOT in the image. Pass FB_ACCESS_TOKEN, FB_AD_ACCOUNT_ID,
 # FB_PAGE_ID (and optionally FB_PIXEL_ID, EKO_ADMIN_*) as environment
-# variables. The dashboard has no login: keep this on an internal network.
+# variables. Also set APP_PASSWORD (and APP_USER, APP_SECRET_KEY) for the login:
+# with no APP_PASSWORD the app refuses every request except from itself.
 ENV PORT=5000
 EXPOSE 5000
 

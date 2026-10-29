@@ -21,6 +21,7 @@
       <a href="/experiments">Experiments</a>
       <a href="/signups" class="active">Signups</a>
       <a href="/overview">Overview</a>
+      {% if auth_user %}<form method="post" action="/logout" class="signout"><button type="submit">Sign out</button></form>{% endif %}
     </div>
   </div>
 

@@ -27,6 +27,8 @@ import performance
 import experiments
 
 app = Flask(__name__)
+import dash_login
+dash_login.init_auth(app)
 
 DEFAULT_LOGO_PATH = str(config.ROOT / "assets" / "eko-logo.svg")
 LAST_RUN_PATH = config.DATA_DIR / "last_run.json"

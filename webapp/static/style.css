@@ -575,3 +575,10 @@ pre {
 .basis-comp { background: #e3edfb; color: #1b4f9c; }
 .caveat-list { margin: 14px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); }
 .caveat-list li { margin-bottom: 4px; }
+
+.topbar .nav .signout { margin: 0; }
+.topbar .nav .signout button {
+  color: white; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 18px; border: 0; border-radius: 999px;
+  background: rgba(255,255,255,0.12); cursor: pointer; white-space: nowrap; transition: background .15s;
+}
+.topbar .nav .signout button:hover { background: rgba(255,255,255,0.22); }

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import io
+import os
 
 from flask import Flask, render_template, request, send_from_directory, redirect, url_for, send_file, abort, jsonify
 
@@ -874,6 +875,9 @@ if __name__ == "__main__":
     # means a stuck port from a previous run can never fully block startup.
     # threaded=True keeps the slow /dashboard route (many live Meta API
     # calls) from blocking every other request on the server.
-    port = _find_free_port(5000)
-    print(f"\n  AdMarketer running at http://127.0.0.1:{port}\n")
-    app.run(debug=False, use_reloader=False, threaded=True, host="127.0.0.1", port=port)
+    # In a container set APP_HOST=0.0.0.0 (the Dockerfile uses gunicorn instead,
+    # which reads PORT itself). Defaults keep the local behaviour unchanged.
+    host = os.environ.get("APP_HOST", "127.0.0.1")
+    port = int(os.environ["PORT"]) if os.environ.get("PORT") else _find_free_port(5000)
+    print(f"\n  AdMarketer running at http://{host}:{port}\n")
+    app.run(debug=False, use_reloader=False, threaded=True, host=host, port=port)

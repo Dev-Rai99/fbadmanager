@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+data/
+output/
+reports/
+scratch_*.json
+*.log
+__pycache__/
+.claude/

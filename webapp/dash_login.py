@@ -11,12 +11,14 @@ deployed without a password is never public by accident.
     APP_API_KEY      optional key for machine callers of /api/facebook-leads
                      (send it as "Authorization: Bearer <key>" or "X-API-Key")
     APP_COOKIE_SECURE=1   mark the cookie Secure when served over https
+    APP_TRUST_PROXY=1     behind one reverse proxy: use its X-Forwarded-For /
+                          -Proto headers, so the lockout counts the real visitor
 """
 import hmac
 import os
 import secrets
 import time
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, session
 
@@ -38,6 +40,9 @@ def init_auth(app):
         SESSION_COOKIE_SECURE=os.environ.get("APP_COOKIE_SECURE") == "1",
         PERMANENT_SESSION_LIFETIME=60 * 60 * 12,
     )
+    if os.environ.get("APP_TRUST_PROXY") == "1":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
     app.register_blueprint(bp)
 
     @app.before_request
@@ -47,14 +52,23 @@ def init_auth(app):
             return None
         if not _password():
             # No password configured: only this computer may use the dashboard.
-            if request.remote_addr in ("127.0.0.1", "::1"):
+            # A forwarded-for header means a proxy is relaying someone else.
+            if request.remote_addr in ("127.0.0.1", "::1") and "X-Forwarded-For" not in request.headers:
                 return None
             return ("Login is not set up on this server. Set APP_PASSWORD.", 503)
         if session.get("user") or _api_key_ok(path):
             return None
         if path.startswith(("/dashboard/status", "/api/")):
             return jsonify({"error": "login required"}), 401
-        return redirect("/login?next=" + _safe_next(request.full_path.rstrip("?")))
+        return redirect("/login?next=" + quote(_safe_next(request.full_path.rstrip("?")), safe="/"))
+
+    @app.after_request
+    def _no_cache(resp):
+        # Signed-in pages hold lead data: don't let the browser keep them for
+        # the back button after sign-out.
+        if not request.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.context_processor
     def _inject_user():
@@ -84,7 +98,10 @@ def _safe_next(target):
 def _locked(ip):
     now = time.time()
     recent = [t for t in _fails.get(ip, []) if now - t < _LOCKOUT_SECONDS]
-    _fails[ip] = recent
+    if recent:
+        _fails[ip] = recent
+    else:
+        _fails.pop(ip, None)
     return len(recent) >= _MAX_FAILS
 
 
@@ -102,6 +119,8 @@ def login():
     if not _password():
         abort(404)
     nxt = _safe_next(request.values.get("next", "/dashboard"))
+    if request.method == "GET" and session.get("user"):
+        return redirect(nxt)
     error = ""
     if request.method == "POST":
         ip = request.remote_addr or "?"

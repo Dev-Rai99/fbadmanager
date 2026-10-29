@@ -20,6 +20,8 @@ USER app
 ENV PORT=5000
 EXPOSE 5000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \n  CMD python -c "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','5000')+'/health',timeout=4)"
+
 # One worker on purpose: the dashboard cache and its background refresh live in
 # this process's memory. Threads handle concurrent requests.
 CMD ["sh", "-c", "exec gunicorn --chdir webapp --workers 1 --threads 8 --timeout 180 --bind 0.0.0.0:${PORT} app:app"]
